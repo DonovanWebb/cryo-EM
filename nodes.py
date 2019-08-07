@@ -34,39 +34,43 @@ def closest_node(node, nodes):
     closest_distance = second_largest(node_index)[1]
     net_points = second_largest(node_index)[2]
     close_dist_id = dict(zip(closest_distance, net_points))
-    close_enough(close_dist_id)
-    return nodes[closest_index, :]
+    return close_dist_id
 
 
-def close_enough(dist, limit = 150):
+def close_enough(dist, limit = 250):
     net_count = 0
     close_points = []
     for i in dist:
         if i < limit:
             net_count += 1
             close_points.append(dist[i])
-    print(close_points)
     return  close_points
 
-def net_maker(box_coord):
+def net_maker(box_coord, close_points_all):
     ids = np.array(range(0,len(box_coord)))
-    dictionary = dict(zip(ids, box_coord))
+    dictionary = dict(zip(ids, close_points_all))
+    print(dictionary)
     for i in dictionary:
-        print(i)
-
+        for j in dictionary[i]:
+            print(box_coord[i], "Connected to", box_coord[j])
+            x_coords = [box_coord[i][0], box_coord[j][0]]
+            y_coords = [box_coord[i][1], box_coord[j][1]]
+            plt.plot(x_coords, y_coords, 'ro-')
 
 # MAIN
 boxes = pd.read_csv(infile, sep='\t', header = None)
 box_val = boxes.values
 box_coord = box_val[:,0:2]
 
-
+close_points_all = []
 for i in range(box_coord.shape[0]):
     point = box_coord[i,:]
-    print("Init point: ", point)
-    print("Closest point: ", closest_node(point, box_coord))
+
+    close_dist_id = closest_node(point, box_coord)
+    close_points = close_enough(close_dist_id)
+    close_points_all.append(close_points)
+net_maker(box_coord, close_points_all)
 
 image = files(imfile)
 plotter(image, box_coord)
 
-net_maker(box_coord)
