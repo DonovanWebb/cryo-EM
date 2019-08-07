@@ -19,7 +19,7 @@ def plotter(image, box_coord):
     plt.imshow(image)
     x_coord = box_coord[:,0]
     y_coord = box_coord[:,1]
-    plt.plot(x_coord, y_coord, 'o', color = 'red')
+    #plt.plot(x_coord, y_coord, 'o', color = 'red')
     plt.show()
 
 def second_largest(numbers):
@@ -37,7 +37,7 @@ def closest_node(node, nodes):
     return close_dist_id
 
 
-def close_enough(dist, limit = 250):
+def close_enough(dist, limit = 400):
     net_count = 0
     close_points = []
     for i in dist:
@@ -51,12 +51,22 @@ def net_maker(box_coord, close_points_all):
     dictionary = dict(zip(ids, close_points_all))
     print(dictionary)
     for i in dictionary:
-        for j in dictionary[i]:
-            print(box_coord[i], "Connected to", box_coord[j])
-            x_coords = [box_coord[i][0], box_coord[j][0]]
-            y_coords = [box_coord[i][1], box_coord[j][1]]
-            plt.plot(x_coords, y_coords, 'ro-')
-
+	if dictionary[i] == []:
+		    x_coords_b1 = [box_coord[i][0], box_coord[i][0], box_coord[i][0]+200, box_coord[i][0]+200]
+		    y_coords_b1 = [box_coord[i][1], box_coord[i][1]+200, box_coord[i][1]+200, box_coord[i][1]]
+		    plt.fill(x_coords_b1, y_coords_b1, 'r')
+	else:
+		for j in dictionary[i]:
+		    print(box_coord[i], "Connected to", box_coord[j])
+		    x_coords_di1 = [box_coord[i][0], box_coord[j][0], box_coord[j][0]+200, box_coord[i][0]+200]
+		    y_coords_di1 = [box_coord[i][1], box_coord[j][1], box_coord[j][1]+200, box_coord[i][1]+200]
+		    x_coords_di2 = [box_coord[i][0], box_coord[j][0], box_coord[j][0]+200, box_coord[i][0]+200]
+		    y_coords_di2 = [box_coord[i][1]+200, box_coord[j][1]+200, box_coord[j][1], box_coord[i][1]]
+		    x_coords_b1 = [box_coord[i][0], box_coord[i][0], box_coord[i][0]+200, box_coord[i][0]+200]
+		    y_coords_b1 = [box_coord[i][1], box_coord[i][1]+200, box_coord[i][1]+200, box_coord[i][1]]
+		    plt.fill(x_coords_di1, y_coords_di1, 'r')
+		    plt.fill(x_coords_di2, y_coords_di2, 'r')
+		    plt.fill(x_coords_b1, y_coords_b1, 'r')
 # MAIN
 boxes = pd.read_csv(infile, sep='\t', header = None)
 box_val = boxes.values
