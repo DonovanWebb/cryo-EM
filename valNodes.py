@@ -10,6 +10,12 @@ import os.path
 dir_main = '/dls/ebic/data/staff-scratch/Donovan/testdata/BetaGal_CarbonEdge/cryolo_finetune/'
 comparison = '/dls/ebic/data/staff-scratch/Donovan/testdata/BetaGal_CarbonEdge/cryolo_finetune/train_annotation/FoilHole_27272864_Data_27266981_27266982_20180428_0909-168420.box'
 
+global TotFP
+TotFP = 0
+global TotFN
+TotFN = 0
+global TotTP
+TotTP = 0
 
 def files(no_ext, dir_main):
     im_file = dir_main+'train_image/'+no_ext+'.mrc'
@@ -21,12 +27,12 @@ def files(no_ext, dir_main):
 
 def plotter(image, box_coord, comp_coord):
     plt.imshow(image)
-    x_coord = box_coord[:,0]
-    y_coord = box_coord[:,1]
-    plt.plot(x_coord, y_coord, 'o', color = 'red')
     x_coord_comp = comp_coord[:,0]
     y_coord_comp = comp_coord[:,1]
-    plt.plot(x_coord_comp, y_coord_comp, 'o', color = 'blue')
+    plt.plot(x_coord_comp, y_coord_comp, 'o', color = 'green', alpha = 0.4)
+    x_coord = box_coord[:,0]
+    y_coord = box_coord[:,1]
+    plt.plot(x_coord, y_coord, 'o', color = 'red', alpha = 0.4)
     plt.show()
 
 def second_largest(numbers):
@@ -44,7 +50,7 @@ def closest_node(node, nodes):
     return close_dist_id
 
 
-def close_enough(dist, limit = 40):
+def close_enough(dist, limit = 60):
     close_points = []
     for i in dist:
         if i < limit:
@@ -75,6 +81,13 @@ def calcs(box_coord, comp_coord):
     print(f"Number of false postives: {FP}")
     FN = comp_coord.shape[0] - TP
     print(f"Number of false negatives: {FN}")
+    print(f"Number of true positives : {TP}")
+    global TotFP
+    global TotFN
+    global TotTP
+    TotFP += FP
+    TotFN += FN
+    TotTP += TP
     
 
 
@@ -87,9 +100,13 @@ for x in ims:
         no_ext = os.path.splitext(infile)[0]
         image = files(no_ext, dir_main)[0]
         box_file = files(no_ext, dir_main)[1]
+        comp_file = dir_main +  'train_annotation/' + no_ext + '.box'
         box_coord = prep(box_file)
-        comp_coord = prep(comparison)
+        comp_coord = prep(comp_file)
         calcs(box_coord, comp_coord)
         plotter(image, box_coord, comp_coord)
         #plt.savefig('./masks/{}.png'.format(no_ext))
 
+print(f"Total number of false postives: {TotFP}")
+print(f"Total number of false negatives: {TotFN}")
+print(f"Total number of true positives : {TotTP}")
