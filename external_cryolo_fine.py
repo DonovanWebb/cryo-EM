@@ -29,7 +29,7 @@ def run_job(project_dir, job_dir, args_list):
     with open('/dls_sw/apps/EM/crYOLO/cryo_phosaurus/config.json', 'r') as json_file:
         data = json.load(json_file)
         print(data['model']['anchors'])
-        data['model']['anchors'] = f'[{box_size}, {box_size}]'
+        data['model']['anchors'] = [int(box_size), int(box_size)]
         print(data['model']['anchors'])
         data['train']['pretrained_weights'] = '/dls_sw/apps/EM/crYOLO/cryo_phosaurus/gmodel_phosnet_20190516.h5'
 
@@ -67,8 +67,12 @@ def run_job(project_dir, job_dir, args_list):
         individual_files.write(f"{box_size}\n")
         individual_files.close()
 
-    #os.system(f"cryolo_train.py -c config.json -w -g 0 --fine_tune")
+    os.system(f"cryolo_train.py -c config.json -w 0 -g 0 --fine_tune")
     print('done')
+
+    part_doc = open('_crypick.star', 'w')
+    part_doc.write(os.path.join(project_dir, args.in_mics))
+    part_doc.close()
 
     out_doc = gemmi.cif.Document()
     output_nodes_block = out_doc.add_new_block('output_nodes')

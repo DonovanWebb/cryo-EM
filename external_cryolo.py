@@ -1,6 +1,8 @@
 #!/dls/ebic/data/staff-scratch/Donovan/anaconda/envs/cry_rel/bin/python
 """
-Initial external job attempt for RELION 3.1 - not working yet except as a simple skeleton
+External job for calling cryolo within Relion 3.1
+in_mics are the micrographs to be picked on
+in_coords is the model to be used, empty will use general model!
 """
 
 import argparse
@@ -22,14 +24,21 @@ def run_job(project_dir, job_dir, args_list):
     parser.add_argument("--in_mics", help="Input micrographs STAR file")
     parser.add_argument("--j", dest="threads", help="Number of threads to run (ignored)")
     parser.add_argument("--box_size", help="Size of box (~ particle size)")
+    parser.add_argument("--threshold", help="Threshold for picking (default = 0.3)")
+    parser.add_argument("--in_coords", help="model from previous job")
     args = parser.parse_args(args_list)
     #print(args)
+    thresh = args.threshold
     box_size = args.box_size
+    try:
+        model = os.path.join(project_dir, args.in_coords)
+        print(model)
+    except: print('no model specified')
     print(box_size)
     with open('/dls_sw/apps/EM/crYOLO/cryo_phosaurus/config.json', 'r') as json_file:
         data = json.load(json_file)
         print(data['model']['anchors'])
-        data['model']['anchors'] = f'[{box_size}, {box_size}]'
+        data['model']['anchors'] = [int(box_size), int(box_size)]
         print(data['model']['anchors'])
 
     with open('config.json', 'w') as outfile:
@@ -39,18 +48,22 @@ def run_job(project_dir, job_dir, args_list):
     data_as_dict = json.loads(in_doc.as_json())['micrographs']
     print(data_as_dict.keys())
     print(data_as_dict['_rlnmicrographname'])
+    try:
+        os.mkdir('cryolo_input')
+    except: print('cryolo_input exists')
     for micrograph in data_as_dict['_rlnmicrographname']:
         print(micrograph)
-        try:
-            os.mkdir('cryolo_input')
-        except: print('cryolo_input exists')
         try:
             os.link(os.path.join(project_dir, micrograph), os.path.join(project_dir, job_dir, 'cryolo_input', os.path.split(micrograph)[-1]))
         except: print('{} already exists'.format(micrograph))
         print(os.path.join(project_dir, job_dir, 'cryolo_input', os.path.split(micrograph)[-1]))
         print(os.path.join(project_dir, micrograph))
 
-    os.system("cryolo_predict.py -c config.json -i {} -o {} -w /dls_sw/apps/EM/crYOLO/cryo_phosaurus/gmodel_phosnet_20190516.h5 -g 0".format(os.path.join(project_dir, job_dir, 'cryolo_input'),os.path.join(project_dir, job_dir, 'gen_pick')))
+    # Checking to see if a paticular model has been specified
+    if args.in_coords is None:
+        os.system(f"cryolo_predict.py -c config.json -i {os.path.join(project_dir, job_dir, 'cryolo_input')} -o {os.path.join(project_dir, job_dir, 'gen_pick')} -w /dls_sw/apps/EM/crYOLO/cryo_phosaurus/gmodel_phosnet_20190516.h5 -g 0 -t {thresh}")
+    else:
+        os.system(f"cryolo_predict.py -c config.json -i {os.path.join(project_dir, job_dir, 'cryolo_input')} -o {os.path.join(project_dir, job_dir, 'gen_pick')} -w {model} -g 0 -t {thresh}")
     try:
         os.mkdir('data')
     except: print('data file exists')
