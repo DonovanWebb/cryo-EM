@@ -559,7 +559,7 @@ class RelionItOptions(object):
 
     ### 2D classification parameters
     # Wait with the first 2D classification batch until at least this many particles are extracted
-    minimum_batch_size = 1000
+    minimum_batch_size = 500
     # Number of iterations to perform in 2D classification
     class2d_nr_iter = 20
     # Rotational search step (in degrees)
@@ -1868,6 +1868,7 @@ def run_pipeline(opts):
 
             continue_this_pass = True
             while continue_this_pass:
+                print('and continuing')
 
                 have_new_batch = False
                 nr_batches = len(glob.glob(split_job + "particles_split*.star"))
@@ -1885,7 +1886,9 @@ def run_pipeline(opts):
                     particles_star_file = batch_name
 
                     # The first batch is special: perform 2D classification with smaller batch size (but at least minimum_batch_size) and keep overwriting in the same output directory
+                    print(rerun_batch1)
                     if ( rerun_batch1 or batch_size == opts.batch_size):
+                        print('keep going')
 
 
                         # Discard particles with odd average/stddev values
@@ -1920,6 +1923,7 @@ def run_pipeline(opts):
 
                         # 2D classification
                         if (ipass == 0 and opts.do_class2d) or (ipass == 1 and opts.do_class2d_pass2):
+                            print('almost there...')
 
                             class2d_options = ['Input images STAR file: == {}'.format(particles_star_file),
                                                'Number of classes: == {}'.format(opts.class2d_nr_classes),
