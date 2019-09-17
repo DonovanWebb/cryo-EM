@@ -325,7 +325,7 @@ class RelionItOptions(object):
     ### Autopick parameters
     # Run Cryolo picking or autopicking
     autopick_do_cryolo = True
-    cryolo_boxsize = 300
+    cryolo_boxsize = 256
     cryolo_threshold = 0.3
     # Use reference-free Laplacian-of-Gaussian picking (otherwise use reference-based template matching instead)
     autopick_do_LoG = True
@@ -1628,8 +1628,8 @@ def run_pipeline(opts):
 	runjobs.append(ctffind_job)
 
         # There is an option to stop on-the-fly processing after CTF estimation
-        if not opts.autopick_do_cryolo:
-            if not opts.stop_after_ctf_estimation:
+        if not opts.stop_after_ctf_estimation:
+            if not opts.autopick_do_cryolo:
                 autopick_options = ['Input micrographs for autopick: == {}micrographs_ctf.star'.format(ctffind_job),
                                     'Min. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_min),
                                     'Max. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_max),
@@ -1693,6 +1693,7 @@ def run_pipeline(opts):
 
                 autopick_job, already_had_it  = addJob('AutoPick', autopick_job_name, SETUP_CHECK_FILE, autopick_options, alias=autopick_alias)
                 runjobs.append(autopick_job)
+                '''
 
                 #### Set up the Extract job
                 extract_options = ['Input coordinates:  == {}coords_suffix_autopick.star'.format(autopick_job),
@@ -1750,34 +1751,40 @@ def run_pipeline(opts):
             RunJobs(runjobs, opts.preprocess_repeat_times, opts.preprocess_repeat_wait, preprocess_schedule_name)
             print ' RELION_IT: submitted',preprocess_schedule_name,'pipeliner with', opts.preprocess_repeat_times,'repeats of the preprocessing jobs'
             print ' RELION_IT: this pipeliner will run in the background of your shell. You can stop it by deleting the file RUNNING_PIPELINER_'+preprocess_schedule_name
+                '''
 
-        else:
-            # This is to run Cryolo! (must do picking and then Extraction)
-            preprocess_schedule_name = 'BEFORE_CRYOLO'
-            # Running jobs up until picking
-            RunJobs(runjobs, opts.preprocess_repeat_times, opts.preprocess_repeat_wait, preprocess_schedule_name)
-            print(ctffind_job)
-            # Add a wait?
-            WaitForJob(ctffind_job, 30)
-            cryolo_options = ['--in_mics {}'.format(os.path.join(ctffind_job + 'micrographs_ctf.star')),
-                                '--o {}'.format('External'),
-                                '--box_size {}'.format(opts.cryolo_boxsize),
-                                '--threshold {}'.format(opts.cryolo_threshold)]
-            option_string = ''
-            for cry_option in cryolo_options:
-                option_string += cry_option
-                option_string += ' '
-            command = '~/Documents/pythonEM/Cryolo_relion3.0/external_cryolo_3.py ' + option_string
-            os.system(command)
-            print(command)
-            # Add a wait? No need...
+            #### CRYOLO INSERT BEGIN ####
+            else:
+                preprocess_schedule_name = 'BEFORE_CRYOLO'
+                # Running jobs up until picking
+                RunJobs(runjobs, opts.preprocess_repeat_times, opts.preprocess_repeat_wait, preprocess_schedule_name)
+                WaitForJob(ctffind_job, 1)
+                cryolo_options = ['--in_mics {}'.format(os.path.join(ctffind_job + 'micrographs_ctf.star')),
+                                    '--o {}'.format('External'),
+                                    '--box_size {}'.format(opts.cryolo_boxsize),
+                                    '--threshold {}'.format(opts.cryolo_threshold)]
+                option_string = ''
+                for cry_option in cryolo_options:
+                    option_string += cry_option
+                    option_string += ' '
+                command = '~/Documents/pythonEM/Cryolo_relion3.0/external_cryolo_3.py ' + option_string
+                print(' RELION_IT: RUNNING {}'.format(command))
+                os.system(command)
+                #### CRYOLO INSERT END ####
 
             #### Set up the Extract job
-            extract_options = ['Input coordinates:  == {}_crypick.star'.format('External/'),
-                            'micrograph STAR file:  == {}micrographs_ctf.star'.format(ctffind_job),
-                            'Diameter background circle (pix):  == {}'.format(opts.extract_bg_diameter),
-                            'Particle box size (pix): == {}'.format(opts.extract_boxsize),
-                            'Number of MPI procs: == {}'.format(opts.extract_mpi)]
+            if opts.autopick_do_cryolo:
+                extract_options = ['Input coordinates:  == {}_crypick.star'.format('External/'),
+                                'micrograph STAR file:  == {}micrographs_ctf.star'.format(ctffind_job),
+                                'Diameter background circle (pix):  == {}'.format(opts.extract_bg_diameter),
+                                'Particle box size (pix): == {}'.format(opts.extract_boxsize),
+                                'Number of MPI procs: == {}'.format(opts.extract_mpi)]
+            else:
+                extract_options = ['Input coordinates:  == {}coords_suffix_autopick.star'.format(autopick_job),
+                                'micrograph STAR file:  == {}micrographs_ctf.star'.format(ctffind_job),
+                                'Diameter background circle (pix):  == {}'.format(opts.extract_bg_diameter),
+                                'Particle box size (pix): == {}'.format(opts.extract_boxsize),
+                                'Number of MPI procs: == {}'.format(opts.extract_mpi)]
 
             if ipass == 0:
                 if opts.extract_downscale:
@@ -1799,27 +1806,30 @@ def run_pipeline(opts):
                 extract_alias = 'pass 2'
 
             extract_job, already_had_it  = addJob('Extract', extract_job_name, SETUP_CHECK_FILE, extract_options, alias=extract_alias)
-            runjobs = [extract_job]
+            if opts.autopick_do_cryolo:
+                runjobs = [extract_job]
+            else:
+                runjobs.append(extract_job)
 
-            if (ipass == 0 and (opts.do_class2d or opts.do_class3d)) or (ipass == 1 and (opts.do_class2d_pass2 or opts.do_class3d_pass2)):
-                #### Set up the Select job to split the particle STAR file into batches
-                split_options = ['OR select from particles.star: == {}particles.star'.format(extract_job),
-                                'OR: split into subsets? == Yes',
-                                'OR: number of subsets:  == -1']
+        if (ipass == 0 and (opts.do_class2d or opts.do_class3d)) or (ipass == 1 and (opts.do_class2d_pass2 or opts.do_class3d_pass2)):
+            #### Set up the Select job to split the particle STAR file into batches
+            split_options = ['OR select from particles.star: == {}particles.star'.format(extract_job),
+                            'OR: split into subsets? == Yes',
+                            'OR: number of subsets:  == -1']
 
-                if ipass == 0:
-                    split_job_name = 'split_job'
-                    split_options.append('Subset size:  == {}'.format(opts.batch_size))
-                    split_alias = 'into {}'.format(opts.batch_size) 
-                else:
-                    split_job_name = 'split2_job'
-                    split_options.append('Subset size:  == {}'.format(opts.batch_size_pass2))
-                    split_alias = 'into {}'.format(opts.batch_size_pass2)
+            if ipass == 0:
+                split_job_name = 'split_job'
+                split_options.append('Subset size:  == {}'.format(opts.batch_size))
+                split_alias = 'into {}'.format(opts.batch_size) 
+            else:
+                split_job_name = 'split2_job'
+                split_options.append('Subset size:  == {}'.format(opts.batch_size_pass2))
+                split_alias = 'into {}'.format(opts.batch_size_pass2)
 
-                split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, alias=split_alias)
+            split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, alias=split_alias)
 
-                # Now start running stuff
-                runjobs.append(split_job)
+            # Now start running stuff
+            runjobs.append(split_job)
             # Now execute the entire preprocessing pipeliner
             if ipass == 0:
                 preprocess_schedule_name = PREPROCESS_SCHEDULE_PASS1
@@ -1868,7 +1878,6 @@ def run_pipeline(opts):
 
             continue_this_pass = True
             while continue_this_pass:
-                print('and continuing')
 
                 have_new_batch = False
                 nr_batches = len(glob.glob(split_job + "particles_split*.star"))
@@ -1888,7 +1897,6 @@ def run_pipeline(opts):
                     # The first batch is special: perform 2D classification with smaller batch size (but at least minimum_batch_size) and keep overwriting in the same output directory
                     print(rerun_batch1)
                     if ( rerun_batch1 or batch_size == opts.batch_size):
-                        print('keep going')
 
 
                         # Discard particles with odd average/stddev values
@@ -1923,7 +1931,6 @@ def run_pipeline(opts):
 
                         # 2D classification
                         if (ipass == 0 and opts.do_class2d) or (ipass == 1 and opts.do_class2d_pass2):
-                            print('almost there...')
 
                             class2d_options = ['Input images STAR file: == {}'.format(particles_star_file),
                                                'Number of classes: == {}'.format(opts.class2d_nr_classes),
